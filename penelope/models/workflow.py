@@ -1,16 +1,11 @@
 from sqlalchemy import Column, Unicode
-from zope.interface import implements
 from repoze.workflow import get_workflow
-
-from penelope.core.models.interfaces import IWorkflowEnabled
 
 
 class Workflow(object):
     """
     Workflow enable implementation for POR project
     """
-    implements(IWorkflowEnabled)
-
     workflow_state = Column(Unicode)
 
     def __init__(self, *args, **kwargs):

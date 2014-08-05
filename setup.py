@@ -30,7 +30,7 @@ tests_require = [
 
 
 setup(name='penelope.models',
-      version='2.1.36.dev0',
+      version='1.0dev0',
       description='Penelope main package',
       long_description=README + '\n\n' +  CHANGES,
       classifiers=[

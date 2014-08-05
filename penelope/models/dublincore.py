@@ -3,9 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm import deferred
 from sqlalchemy.ext.declarative import declared_attr
 from datetime import datetime
-from zope.interface import implements
 
-from penelope.core.models.interfaces import IDublinCore
 from pyramid.threadlocal import get_current_request
 
 
@@ -13,8 +11,6 @@ class DublinCore(object):
     """
     Base dublincore implementation for POR project
     """
-
-    implements(IDublinCore)
 
     @declared_attr
     def creation_date(cls):

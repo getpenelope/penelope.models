@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from copy import deepcopy
-from zope.interface import implements
 from sqlalchemy import Column
 from sqlalchemy import Date
 from sqlalchemy import DateTime
@@ -13,13 +12,12 @@ from sqlalchemy import String
 from sqlalchemy import event
 from sqlalchemy.orm import relationship, backref
 
-from penelope.core.models.dublincore import dublincore_insert, dublincore_update, DublinCore
-from penelope.core.models import Base, CustomerRequest, GlobalConfig, DBSession
-from penelope.core.models import workflow, classproperty
-from penelope.core.models.tickets import ticket_store
-from penelope.core.models.interfaces import ITimeEntry, IProjectRelated
-from penelope.core.security.acl import CRUD_ACL
-from penelope.core.lib.helpers import timedelta_as_human_str, timedelta_as_work_days
+from penelope.models.dublincore import dublincore_insert, dublincore_update, DublinCore
+from penelope.models import Base, CustomerRequest, GlobalConfig
+from penelope.models import workflow, classproperty
+from penelope.models.tickets import ticket_store
+from penelope.models import timedelta_as_human_str, timedelta_as_work_days
+from penelope.models.security import CRUD_ACL
 
 
 class TimeEntryException(Exception):
@@ -27,7 +25,6 @@ class TimeEntryException(Exception):
 
 
 class TimeEntry(DublinCore, workflow.Workflow, Base):
-    implements(ITimeEntry, IProjectRelated)
     __tablename__ = 'time_entries'
 
     id = Column(Integer, primary_key=True)
@@ -118,7 +115,7 @@ class TimeEntry(DublinCore, workflow.Workflow, Base):
             return author and author.amount or 0
 
         def get_company_cost():
-            company = DBSession().query(GlobalConfig).one().cost_per_day(self.date)
+            company = Session.object_session(self).query(GlobalConfig).one().cost_per_day(self.date)
             return company and company.amount or 0
 
         if author_only:

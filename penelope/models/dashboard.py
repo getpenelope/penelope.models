@@ -9,8 +9,6 @@ import datetime
 
 from json import loads
 from copy import deepcopy
-from zope.interface import implements
-from zope.component import getMultiAdapter
 from plone.i18n.normalizer import idnormalizer
 from pyramid.security import ALL_PERMISSIONS
 from pyramid.security import Authenticated
@@ -29,19 +27,16 @@ from sqlalchemy import Table
 from sqlalchemy import event, func, and_
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import deferred
+from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import column_property
 from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm.properties import ColumnProperty
 
-from penelope.core.security.acl import CRUD_ACL, ACL, IRoleFinder
-from penelope.core.security.acl import invalidate_user_calculate_matrix, invalidate_users_calculate_matrix
-from penelope.core import html2text
-from penelope.core.models import Base, DBSession, dublincore, workflow, classproperty
-from penelope.core.models.interfaces import ICustomerRequest, IRoleable, IProjectRelated
-from penelope.core.models.interfaces import IProject, IUser, IPorModel, ICustomer, IRole
-from penelope.core.models.interfaces import IApplication, ITrac, ISVN, IGoogleDocs
-from penelope.core.models.interfaces import ITracReport, IGenericApp, IContract, IKanbanBoard
+from penelope.models.security import CRUD_ACL, ACL
+from penelope.models import html2text, TRAC, SVN, TRAC_REPORT, GENERIC_APP, GOOGLE_DOCS
+from penelope.models import Base, dublincore, workflow, classproperty
+from penelope.models import timedelta_as_work_days
 
 
 role_assignments = Table('role_assignments', Base.metadata,
@@ -66,8 +61,6 @@ kanban_projects = Table('kanban_projects', Base.metadata,
 
 
 class GlobalConfig(Base):
-    implements(IPorModel)
-
     __tablename__ = "global_config"
     __acl__ = ACL('por_global_config_acl')
     __acl__.deny('system.Everyone', ALL_PERMISSIONS)
@@ -82,8 +75,6 @@ class GlobalConfig(Base):
 
 
 class Principal(Base):
-    implements(IPorModel)
-
     __tablename__ = "principals"
     __acl__ = deepcopy(CRUD_ACL)
 
@@ -91,8 +82,6 @@ class Principal(Base):
 
 
 class Role(Base):
-    implements(IRole)
-
     __tablename__ = "roles"
     __acl__ = deepcopy(CRUD_ACL)
 
@@ -121,8 +110,6 @@ class LowercaseComparator(ColumnProperty.Comparator):
 
 
 class User(Principal):
-    implements(IRoleable, IUser)
-
     __tablename__ = 'users'
 
     @classproperty
@@ -194,9 +181,6 @@ class User(Principal):
     def roles_names(self):
         return [a.id.lower() for a in self.roles]
 
-    def roles_in_context(self, context=None):
-        return getMultiAdapter((context, self), IRoleFinder).get_roles()
-
     def __str__(self):
         return self.__unicode__().encode('utf8')
 
@@ -215,8 +199,6 @@ def user_email(mapper, connection, target):
 
 event.listen(User, "before_insert", user_email)
 event.listen(User, "before_update", user_email)
-event.listen(User.roles, "append", invalidate_user_calculate_matrix)
-event.listen(User.roles, "remove", invalidate_user_calculate_matrix)
 
 
 class PasswordResetToken(Base):
@@ -231,8 +213,6 @@ class PasswordResetToken(Base):
 
 
 class OpenId(Base):
-    implements(IPorModel)
-
     __tablename__ = 'openids'
     __acl__ = deepcopy(CRUD_ACL)
     id = Column(Integer, primary_key=True)
@@ -251,8 +231,6 @@ class OpenId(Base):
 
 
 class Cost(Base):
-    implements(IPorModel)
-
     __tablename__ = 'costs'
     __acl__ = deepcopy(CRUD_ACL)
     id = Column(Integer, primary_key=True)
@@ -275,8 +253,6 @@ class Cost(Base):
 
 
 class Customer(dublincore.DublinCore, Base):
-    implements(ICustomer)
-
     __tablename__ = 'customers'
     __acl__ = deepcopy(CRUD_ACL)
     #view
@@ -327,9 +303,6 @@ event.listen(Customer, "before_update", dublincore.dublincore_update)
 
 
 class Project(dublincore.DublinCore, Base):
-
-    implements(IProject, IProjectRelated)
-
     project_related_label = 'Project'
     project_related_id = ''
 
@@ -436,11 +409,11 @@ class Project(dublincore.DublinCore, Base):
     @property
     def tracs(self):
         for app in self.applications:
-            if ITrac.providedBy(app):
+            if isinstance(app, Trac):
                 yield app
 
     def get_number_of_tickets_per_cr(self):
-        from penelope.core.models.tickets import ticket_store
+        from penelope.models.tickets import ticket_store
         return ticket_store.get_number_of_tickets_per_cr(self)
 
     @hybrid_method
@@ -452,7 +425,7 @@ class Project(dublincore.DublinCore, Base):
         return (self.activated != False) & (self.activated != None)
 
     def contracts_by_state(self):
-        return DBSession().query(Contract.id, Contract.name, Contract.workflow_state)\
+        return Session.object_session(self).query(Contract.id, Contract.name, Contract.workflow_state)\
                           .join(Project).filter(Project.id==self.id)\
                           .order_by(Contract.active.desc())\
                           .order_by(Contract.modification_date.desc())\
@@ -467,20 +440,9 @@ def new_project_created(mapper, connection, target):
 event.listen(Project, "before_insert", new_project_created)
 event.listen(Project, "before_insert", dublincore.dublincore_insert)
 event.listen(Project, "before_update", dublincore.dublincore_update)
-event.listen(Project.manager, "append", invalidate_users_calculate_matrix)
-event.listen(Project.manager, "remove", invalidate_users_calculate_matrix)
-
-
-GOOGLE_DOCS = 'google docs'
-SVN = 'svn'
-TRAC = 'trac'
-TRAC_REPORT = 'trac report'
-GENERIC_APP = 'generic'
 
 
 class Application(dublincore.DublinCore, Base):
-    implements(IProjectRelated, IApplication)
-
     project_related_label = 'Applications'
     project_related_id = 'applications'
 
@@ -576,7 +538,6 @@ class ApplicationACL(Base):
         return '(%s, %s, %s)' % (self.application_id, self.role_id, self.permission_name)
 
 
-
 def modify_application_type(mapper, connection, target):
     request = get_current_request()
     if request:
@@ -608,17 +569,17 @@ def update_app_position(mapper, connection, target):
         if app.id == target.id:
             if target.position == -1: #  keep last 
                 app = target.project.applications.pop(n)
-                DBSession().query(Project).get(app.project_id).applications.append(app)
+                Session.object_session(target).query(Project).get(app.project_id).applications.append(app)
             elif n != target.position:
                 app = target.project.applications.pop(n)
-                DBSession().query(Project).get(app.project_id).applications.insert(target.position, app)
+                Session.object_session(target).query(Project).get(app.project_id).applications.insert(target.position, app)
 
             target.project.applications.reorder()
             break
 
 def default_app_position(mapper, connection, target):
     if not target.position:
-        app_len = len(DBSession().query(Project).get(target.project_id).applications)
+        app_len = len(Session.object_session(target).query(Project).get(target.project_id).applications)
         target.position = app_len + 100
 
 
@@ -642,12 +603,12 @@ def create_initial_application_acl(mapper, connection, target):
         acl_rules.append(('customer', 'view'))
 
     for role_id, permission_name in acl_rules:
-        acl = DBSession.query(ApplicationACL).get((target.id, role_id, permission_name))
+        acl = Session.object_session(target).query(ApplicationACL).get((target.id, role_id, permission_name))
         if not acl:
             acl = ApplicationACL(application_id=target.id,
                                  role_id=role_id,
                                  permission_name=permission_name)
-            DBSession.add(acl)
+            Session.object_session(target).add(acl)
         else:
             # XXX this should not happen.
             pass
@@ -665,38 +626,26 @@ event.listen(Application, "before_update", update_app_position, propagate=True)
 
 
 class GenericApp(Application):
-
-    implements(IGenericApp)
     __mapper_args__ = {'polymorphic_identity': GENERIC_APP}
 
 
 class Trac(Application):
-
-    implements(ITrac)
     __mapper_args__ = {'polymorphic_identity': TRAC}
 
 
 class TracReport(Application):
-
-    implements(ITracReport)
     __mapper_args__ = {'polymorphic_identity': TRAC_REPORT}
 
 
 class Subversion(Application):
-
-    implements(ISVN)
     __mapper_args__ = {'polymorphic_identity': SVN}
 
 
 class GoogleDoc(Application):
-
-    implements(IGoogleDocs)
     __mapper_args__ = {'polymorphic_identity': GOOGLE_DOCS}
 
 
 class Contract(dublincore.DublinCore, workflow.Workflow, Base):
-    implements(IContract, IProjectRelated)
-
     project_related_label = 'Contracts'
     project_related_id = 'contracts'
 
@@ -755,8 +704,6 @@ event.listen(Contract, "before_update", dublincore.dublincore_update)
 
 
 class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
-    implements(ICustomerRequest, IProjectRelated)
-
     project_related_label = 'Customer requests'
     project_related_id = 'customer_requests'
 
@@ -810,7 +757,7 @@ class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
         return (self.workflow_state == 'estimated' or self.workflow_state == 'created')
 
     def get_tickets(self, request=None):
-        from penelope.core.models.tickets import ticket_store
+        from penelope.models.tickets import ticket_store
         return ticket_store.get_tickets_for_request(customer_request=self)
 
     def add_ticket_url(self, request):
@@ -829,7 +776,7 @@ class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
     @property
     def estimation_days(self):
         if self.filler and self.contract:
-            other_crs = DBSession().query(CustomerRequest)\
+            other_crs = Session.object_session(self).query(CustomerRequest)\
                                    .filter_by(filler=False)\
                                    .filter_by(contract_id=self.contract_id)
             filler = self.contract.days - sum([cr.estimation_days for cr in other_crs])
@@ -841,7 +788,6 @@ class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
 
     @property
     def timeentries_days(self):
-        from penelope.core.lib.helpers import timedelta_as_work_days
         hours = sum([a.hours for a in self.time_entries], datetime.timedelta())
         return timedelta_as_work_days(hours)
 
@@ -869,7 +815,7 @@ def after_customer_request_flushed(session, flush_context, instances):
             obj.id = "%s_%s" % (project_id, last[project_id])
 
 
-event.listen(DBSession, "before_flush", after_customer_request_flushed)
+event.listen(Session, "before_flush", after_customer_request_flushed)
 event.listen(CustomerRequest, "before_insert", dublincore.dublincore_insert)
 event.listen(CustomerRequest, "before_update", dublincore.dublincore_update)
 
@@ -898,7 +844,7 @@ class Estimation(Base):
 
 def check_cr_for_estimation(mapper, connection, target):
     state = ''
-    cr = DBSession().query(CustomerRequest).get(target.customer_request_id)
+    cr = Session.object_session(target).query(CustomerRequest).get(target.customer_request_id)
 
     if target in cr.estimations and len(cr.estimations) == 1 and cr.workflow_state != 'created': # removing last estimation
         state = 'created'
@@ -919,8 +865,6 @@ event.listen(Estimation, "before_delete", check_cr_for_estimation)
 
 
 class Group(Principal):
-    implements(IRoleable, IProjectRelated)
-
     project_related_label = 'Groups'
     project_related_id = 'configuration'
 
@@ -972,18 +916,8 @@ class Group(Principal):
     def __unicode__(self):
         return "[%s] %s" % (self.project.name, ','.join(self.roles_names))
 
-def wrap_users_before_group_delete(mapper, connection, target):
-    for user in target.users:
-        invalidate_user_calculate_matrix(user, None, None)
-
-event.listen(Group.users, "append", invalidate_users_calculate_matrix)
-event.listen(Group.users, "remove", invalidate_users_calculate_matrix)
-event.listen(Group, "before_delete", wrap_users_before_group_delete)
-
 
 class SavedQuery(dublincore.DublinCore, Base):
-    implements(IPorModel)
-
     __tablename__ = 'saved_queries'
 
     id = Column(Integer, primary_key=True)
@@ -1007,13 +941,7 @@ event.listen(SavedQuery, "before_insert", dublincore.dublincore_insert)
 event.listen(SavedQuery, "before_update", dublincore.dublincore_update)
 
 
-BACKLOG_PRIORITY_ORDER = 'priority'
-BACKLOG_MODIFICATION_ORDER = 'modification'
-
-
 class KanbanBoard(dublincore.DublinCore, Base):
-    implements(IKanbanBoard)
-
     __tablename__ = 'kanban_boards'
 
     @classproperty
@@ -1069,7 +997,7 @@ def create_initial_kanban_acl(mapper, connection, target):
         acl = KanbanACL(principal=principal_id,
                 board_id=target.id,
                 permission_name=permission_name)
-        DBSession().add(acl)
+        Session.object_session(target).add(acl)
 
 event.listen(KanbanBoard, "after_insert", create_initial_kanban_acl, propagate=True)
 event.listen(KanbanBoard, "before_insert", dublincore.dublincore_insert)

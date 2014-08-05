@@ -4,18 +4,16 @@ from trac.core import TracError
 from trac.ticket.query import Query
 from trac.ticket.model import Ticket
 from trac.env import Environment
+from sqlalchemy.orm.session import Session
 from pyramid.threadlocal import get_current_registry, get_current_request
-from zope.interface import implements
-from penelope.core.models.interfaces import ITicketStore
-from penelope.core.models import DBSession
 
 
 class TicketStore(object):
-    implements(ITicketStore)
 
     def get_ticket(self, project_id, ticket_id):
-        from penelope.core.models.dashboard import Project
-        project = DBSession().query(Project).get(project_id)
+        from penelope.models.dashboard import Project
+        request = get_current_request()
+        project = Session.object_session(request.authenticated_user).query(Project).get(project_id)
         if project:
             settings = get_current_registry().settings
             tracenvs = settings.get('penelope.trac.envs')
@@ -29,8 +27,9 @@ class TicketStore(object):
                     return None
 
     def get_raw_ticket(self, project_id, ticket_id):
-        from penelope.core.models.dashboard import Project
-        project = DBSession().query(Project).get(project_id)
+        from penelope.models.dashboard import Project
+        request = get_current_request()
+        project = Session.object_session(request.authenticated_user).query(Project).get(project_id)
         if project:
             settings = get_current_registry().settings
             tracenvs = settings.get('penelope.trac.envs')
@@ -174,7 +173,7 @@ class TicketStore(object):
     def add_tickets(self, project, customerrequest, tickets, reporter, notify=False):
         from trac.ticket.notification import TicketNotifyEmail
         from trac.util.text import exception_to_unicode
-        from penelope.core.models.dashboard import User
+        from penelope.models.dashboard import User
 
         settings = get_current_registry().settings
         tracenvs = settings.get('penelope.trac.envs')
@@ -182,7 +181,7 @@ class TicketStore(object):
 
         for trac in project.tracs:
             for t in tickets:
-                owner = DBSession.query(User).get(t['owner'])
+                owner = Session.object_session(request.authenticated_user).query(User).get(t['owner'])
                 ticket = {'summary': t['summary'],
                         'description': t['description'],
                         'customerrequest': customerrequest.id,
