@@ -37,7 +37,7 @@ from penelope.models.security import CRUD_ACL, ACL
 from penelope.models.tickets import ticket_store
 from penelope.models import html2text, TRAC, SVN, TRAC_REPORT, GENERIC_APP, GOOGLE_DOCS
 from penelope.models import Base, dublincore, workflow, classproperty
-from penelope.models import timedelta_as_work_days
+from penelope.models import timedelta_as_work_days, BasePenelopeModel
 
 
 role_assignments = Table('role_assignments', Base.metadata,
@@ -61,7 +61,7 @@ kanban_projects = Table('kanban_projects', Base.metadata,
 )
 
 
-class GlobalConfig(Base):
+class GlobalConfig(BasePenelopeModel):
     __tablename__ = "global_config"
     __acl__ = ACL('por_global_config_acl')
     __acl__.deny('system.Everyone', ALL_PERMISSIONS)
@@ -82,7 +82,7 @@ class Principal(Base):
     id = Column(Integer, Sequence("principals_id"), primary_key=True)
 
 
-class Role(Base):
+class Role(BasePenelopeModel):
     __tablename__ = "roles"
     __acl__ = deepcopy(CRUD_ACL)
 
@@ -110,7 +110,7 @@ class LowercaseComparator(ColumnProperty.Comparator):
         return func.lower(self.__clause_element__()) == func.lower(other)
 
 
-class User(Principal):
+class User(Principal, BasePenelopeModel):
     __tablename__ = 'users'
 
     @classproperty
@@ -202,7 +202,7 @@ event.listen(User, "before_insert", user_email)
 event.listen(User, "before_update", user_email)
 
 
-class PasswordResetToken(Base):
+class PasswordResetToken(BasePenelopeModel):
     __tablename__ = 'password_reset_tokens'
     user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     user = relationship(User, uselist=False)
@@ -213,7 +213,7 @@ class PasswordResetToken(Base):
         return self.token
 
 
-class OpenId(Base):
+class OpenId(BasePenelopeModel):
     __tablename__ = 'openids'
     __acl__ = deepcopy(CRUD_ACL)
     id = Column(Integer, primary_key=True)
@@ -231,7 +231,7 @@ class OpenId(Base):
         return "<OpenID openid=%s>" % self.openid
 
 
-class Cost(Base):
+class Cost(BasePenelopeModel):
     __tablename__ = 'costs'
     __acl__ = deepcopy(CRUD_ACL)
     id = Column(Integer, primary_key=True)
@@ -253,7 +253,7 @@ class Cost(Base):
         return "<Cost user=%s>" % self.user_id
 
 
-class Customer(dublincore.DublinCore, Base):
+class Customer(dublincore.DublinCore, BasePenelopeModel):
     __tablename__ = 'customers'
     __acl__ = deepcopy(CRUD_ACL)
     #view
@@ -303,7 +303,7 @@ event.listen(Customer, "before_insert", dublincore.dublincore_insert)
 event.listen(Customer, "before_update", dublincore.dublincore_update)
 
 
-class Project(dublincore.DublinCore, Base):
+class Project(dublincore.DublinCore, BasePenelopeModel):
     project_related_label = 'Project'
     project_related_id = ''
 
@@ -442,7 +442,7 @@ event.listen(Project, "before_insert", dublincore.dublincore_insert)
 event.listen(Project, "before_update", dublincore.dublincore_update)
 
 
-class Application(dublincore.DublinCore, Base):
+class Application(dublincore.DublinCore, BasePenelopeModel):
     project_related_label = 'Applications'
     project_related_id = 'applications'
 
@@ -519,7 +519,7 @@ class Application(dublincore.DublinCore, Base):
                 }.get(self.application_type, 'btn-inverse')
 
 
-class ApplicationACL(Base):
+class ApplicationACL(BasePenelopeModel):
     __tablename__ = 'applications_acl'
 
     application_id = Column(Integer, ForeignKey('applications.id', ondelete='cascade'), primary_key=True)
@@ -645,7 +645,7 @@ class GoogleDoc(Application):
     __mapper_args__ = {'polymorphic_identity': GOOGLE_DOCS}
 
 
-class Contract(dublincore.DublinCore, workflow.Workflow, Base):
+class Contract(dublincore.DublinCore, workflow.Workflow, BasePenelopeModel):
     project_related_label = 'Contracts'
     project_related_id = 'contracts'
 
@@ -703,7 +703,7 @@ event.listen(Contract, "before_insert", dublincore.dublincore_insert)
 event.listen(Contract, "before_update", dublincore.dublincore_update)
 
 
-class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
+class CustomerRequest(dublincore.DublinCore, workflow.Workflow, BasePenelopeModel):
     project_related_label = 'Customer requests'
     project_related_id = 'customer_requests'
 
@@ -820,7 +820,7 @@ event.listen(CustomerRequest, "before_update", dublincore.dublincore_update)
 
 
 
-class Estimation(Base):
+class Estimation(BasePenelopeModel):
     __tablename__ = "estimations"
     __acl__ = deepcopy(CRUD_ACL)
     #view
@@ -863,7 +863,7 @@ event.listen(Estimation, "before_insert", check_cr_for_estimation)
 event.listen(Estimation, "before_delete", check_cr_for_estimation)
 
 
-class Group(Principal):
+class Group(Principal, BasePenelopeModel):
     project_related_label = 'Groups'
     project_related_id = 'configuration'
 
@@ -916,7 +916,7 @@ class Group(Principal):
         return "[%s] %s" % (self.project.name, ','.join(self.roles_names))
 
 
-class SavedQuery(dublincore.DublinCore, Base):
+class SavedQuery(dublincore.DublinCore, BasePenelopeModel):
     __tablename__ = 'saved_queries'
 
     id = Column(Integer, primary_key=True)
@@ -940,7 +940,7 @@ event.listen(SavedQuery, "before_insert", dublincore.dublincore_insert)
 event.listen(SavedQuery, "before_update", dublincore.dublincore_update)
 
 
-class KanbanBoard(dublincore.DublinCore, Base):
+class KanbanBoard(dublincore.DublinCore, BasePenelopeModel):
     __tablename__ = 'kanban_boards'
 
     @classproperty
@@ -1002,7 +1002,7 @@ event.listen(KanbanBoard, "after_insert", create_initial_kanban_acl, propagate=T
 event.listen(KanbanBoard, "before_insert", dublincore.dublincore_insert)
 event.listen(KanbanBoard, "before_update", dublincore.dublincore_update)
 
-class KanbanACL(Base):
+class KanbanACL(BasePenelopeModel):
     __tablename__ = 'kanban_acl'
 
     id = Column(Integer, primary_key=True)
@@ -1020,7 +1020,7 @@ class KanbanACL(Base):
         return '(%s, %s, %s)' % (self.principal, self.board_id, self.permission_name)
 
 
-class Activity(Base):
+class Activity(BasePenelopeModel):
 
     __tablename__ = 'activities'
     id = Column(Integer, primary_key=True)

@@ -45,6 +45,10 @@ class classproperty(object):
             return self.getter(owner)
 
 
+class BasePenelopeModel(Base):
+    __abstract__ = True
+
+
 from penelope.models.dashboard import Project; Project
 from penelope.models.dashboard import User; User
 from penelope.models.dashboard import GlobalConfig; GlobalConfig

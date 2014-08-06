@@ -12,6 +12,8 @@ CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
 
 requires = [
     'Babel',
+    'plone.i18n',
+    'repoze.workflow',
     'setuptools',
     'SQLAlchemy',
     ]
@@ -25,7 +27,6 @@ tests_require = [
     'pytest-pep8!=1.0.3',
     'pytest-xdist',
     'wsgi_intercept',
-    'zope.testbrowser',
     'pyramid_robot'
     ]
 
