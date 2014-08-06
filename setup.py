@@ -12,6 +12,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
 
 requires = [
     'Babel',
+    'setuptools',
     'SQLAlchemy',
     ]
 

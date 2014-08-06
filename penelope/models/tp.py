@@ -11,14 +11,14 @@ from sqlalchemy import Unicode
 from sqlalchemy import String
 from sqlalchemy import event
 from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm.session import Session
 
 from penelope.models.dublincore import dublincore_insert, dublincore_update, DublinCore
 from penelope.models import Base, CustomerRequest, GlobalConfig
 from penelope.models import workflow, classproperty
-from penelope.models.tickets import ticket_store
 from penelope.models import timedelta_as_human_str, timedelta_as_work_days
 from penelope.models.security import CRUD_ACL
-
+from penelope.models.tickets import ticket_store
 
 class TimeEntryException(Exception):
     """Something wrong happened trying to add a time entry to a project"""

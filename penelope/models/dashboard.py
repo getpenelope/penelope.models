@@ -34,6 +34,7 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm.properties import ColumnProperty
 
 from penelope.models.security import CRUD_ACL, ACL
+from penelope.models.tickets import ticket_store
 from penelope.models import html2text, TRAC, SVN, TRAC_REPORT, GENERIC_APP, GOOGLE_DOCS
 from penelope.models import Base, dublincore, workflow, classproperty
 from penelope.models import timedelta_as_work_days
@@ -413,7 +414,6 @@ class Project(dublincore.DublinCore, Base):
                 yield app
 
     def get_number_of_tickets_per_cr(self):
-        from penelope.models.tickets import ticket_store
         return ticket_store.get_number_of_tickets_per_cr(self)
 
     @hybrid_method
@@ -757,7 +757,6 @@ class CustomerRequest(dublincore.DublinCore, workflow.Workflow, Base):
         return (self.workflow_state == 'estimated' or self.workflow_state == 'created')
 
     def get_tickets(self, request=None):
-        from penelope.models.tickets import ticket_store
         return ticket_store.get_tickets_for_request(customer_request=self)
 
     def add_ticket_url(self, request):

@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 import re
-from trac.core import TracError
-from trac.ticket.query import Query
-from trac.ticket.model import Ticket
-from trac.env import Environment
+
+try:
+    from trac.core import TracError
+    from trac.ticket.query import Query
+    from trac.ticket.model import Ticket
+    from trac.env import Environment
+    TRAC = True
+except ImportError:
+    TRAC = False
+
 from sqlalchemy.orm.session import Session
 from pyramid.threadlocal import get_current_registry, get_current_request
 
@@ -203,5 +209,7 @@ class TicketStore(object):
                     except Exception, e:
                         request.add_message('Failure sending notification on creation '
                         'of a ticket #%s: %s' % (t.id, exception_to_unicode(e)), 'error')
-
-ticket_store = TicketStore()
+if TRAC:
+    ticket_store = TicketStore()
+else:
+    ticket_store = None

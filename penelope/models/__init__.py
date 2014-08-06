@@ -71,6 +71,7 @@ from penelope.models.dashboard import Subversion; Subversion
 from penelope.models.dashboard import GoogleDoc; GoogleDoc
 from penelope.models.dashboard import modify_application_type; modify_application_type
 from penelope.models.tp import TimeEntry; TimeEntry
-from penelope.models.tickets import TicketStore; TicketStore
 from penelope.models.workflow import Workflow; Workflow
 from penelope.models.dublincore import DublinCore; DublinCore
+from penelope.models.tickets import ticket_store; ticket_store
+from penelope.models.tickets import TicketStore; TicketStore
